@@ -5,6 +5,7 @@ struct_kw = {"struct"}
 type_kw = {"type"}
 impl_kw = {"impl"}
 for_kw = {"for"}
+// TODO Add modules and scoped types & traits (Self::Target)
 
 ident = @{(ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
 type_name = @{ident}
