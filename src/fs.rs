@@ -2,7 +2,7 @@ use crate::span::File;
 
 #[derive(Default)]
 pub struct Fs {
-	repl: Vec<String>
+	repl: Vec<String>,
 }
 
 impl Fs {
@@ -15,7 +15,7 @@ impl Fs {
 	pub fn load_file<'a>(&self, file: &File) -> String {
 		match file {
 			File::Repl(i) => self.repl[*i].clone(),
-			File::Path(p) => std::fs::read_to_string(p).unwrap()
+			File::Path(p) => std::fs::read_to_string(p).unwrap(),
 		}
 	}
 }
