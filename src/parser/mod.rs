@@ -1,46 +1,263 @@
 use std::fmt::Display;
 
-use pest::Parser;
+use pest::{
+	iterators::{Pair, Pairs},
+	Parser,
+};
 
 use crate::{
-	ast::{Block, Expr, Literal, Statement},
-	fs::Fs,
-	span::{BoxedSpan, File, Span},
+	ast::{
+		Block, Expr, FnArg, FnDef, Generics, Literal, Mod, Module, Statement, Trait, Type,
+		WhereClause,
+	},
+	fs::{File, Fs},
+	span::{BoxedSpan, Span},
 };
 
 #[derive(Parser)]
 #[grammar = "parser/grammar.pest"]
-struct IdentParser;
+struct LamaParser;
+
+fn tree<T: Display>(pairs: Pairs<Rule>, space: T) {
+	for pair in pairs {
+		println!("{}{:?} [{}]", space, pair.as_rule(), pair.as_str());
+		tree(pair.into_inner(), format!("{}  ", space));
+	}
+}
+
+pub fn parse_module(file: File, fs: &Fs) -> Module {
+	let s = fs.load_file(&file);
+	let pairs = LamaParser::parse(Rule::module, &s).unwrap_or_else(|e| panic!("{}", e));
+	tree(pairs.clone(), "");
+	let mut mod_items = Vec::new();
+	let mut fn_items = Vec::new();
+	for pair in pairs {
+		match pair.as_rule() {
+			Rule::EOI => (),
+			Rule::fn_item => {
+				let mut inner = pair.into_inner();
+				let pub_kw = parse_pub(&mut inner, Rule::fn_kw, file.clone());
+				let name = parse_name(&mut inner, file.clone());
+				let (generics, next) = parse_def_generics(&mut inner, &file);
+				let args = parse_fn_def_args(next.unwrap(), &file);
+				let return_type = {
+					let next = inner.next().unwrap();
+					let span = next.as_span();
+					next.into_inner()
+						.next()
+						.map(|x| parse_type(x, file.clone()))
+						.unwrap_or(Span::new(span, file.clone(), Type::Empty))
+				};
+				let possible_where = inner.next().unwrap();
+				let (where_clause, body) = if possible_where.as_rule() == Rule::where_clause {
+					(
+						Some(parse_where_clause(possible_where, &file)),
+						inner.next().unwrap(),
+					)
+				} else {
+					(None, possible_where)
+				};
+				// TODO parse possible where clause
+				let body = Span::new(
+					body.as_span(),
+					file.clone(),
+					parse_block(body.into_inner(), &file),
+				);
+				fn_items.push(FnDef {
+					pub_kw,
+					name,
+					generics,
+					args,
+					return_type,
+					where_clause,
+					body,
+				})
+			}
+			Rule::mod_item => {
+				let mut inner = pair.into_inner();
+				let pub_kw = parse_pub(&mut inner, Rule::mod_kw, file.clone());
+				let name = parse_name(&mut inner, file.clone());
+				mod_items.push(Mod { pub_kw, name })
+			}
+			_ => unreachable!(),
+		}
+	}
+	Module::new(mod_items, fn_items)
+}
+
+/// Parse a possible pub keyword and ignore the next pair
+fn parse_pub(inner: &mut Pairs<Rule>, next_rule: Rule, file: File) -> Option<Span<()>> {
+	parse_maybe_rule_matching_next(inner, Rule::pub_kw, next_rule)
+		.unwrap() // Assume there must be a next expression must match thanks to the PEG definition in grammar.pest
+		.map(|pair| Span::new(pair.as_span(), file, ()))
+}
+
+/// Parse an ident (or any pair as a Span<String>)
+fn parse_name(inner: &mut Pairs<Rule>, file: File) -> Span<String> {
+	let name = inner.next().unwrap();
+	Span::new(name.as_span(), file, name.as_str().to_string())
+}
+
+/// Parse a type
+fn parse_type(typ: Pair<Rule>, file: File) -> Span<Type> {
+	let span = typ.as_span();
+	let mut inner = typ.into_inner();
+	let first = inner.next().unwrap();
+	let content = match first.as_rule() {
+		Rule::ident =>
+		/* Other type */
+		{
+			let name = Span::new(first.as_span(), file.clone(), first.as_str().to_string());
+			let generics = if let Some(p) = inner.next() {
+				parse_generics(p, &file)
+			} else {
+				Vec::new()
+			};
+
+			Type::Other { name, generics }
+		}
+		Rule::empty_type => Type::Empty,
+		_ => unreachable!(),
+	};
+	Span::new(span, file, content)
+}
+
+/// Parse a trait
+fn parse_trait(trait_: Pair<Rule>, file: File) -> Span<Trait> {
+	let span = trait_.as_span();
+	let mut inner = trait_.into_inner();
+	let first = inner.next().unwrap();
+	let content = match first.as_rule() {
+		Rule::ident =>
+		/* Other type */
+		{
+			let name = Span::new(first.as_span(), file.clone(), first.as_str().to_string());
+			let generics = if let Some(p) = inner.next() {
+				parse_generics(p, &file)
+			} else {
+				Vec::new()
+			};
+
+			Trait { name, generics }
+		}
+		_ => unreachable!(),
+	};
+	Span::new(span, file, content)
+}
+
+/// Parse definition generics
+fn parse_def_generics<'a>(
+	inner: &'a mut Pairs<Rule>,
+	file: &File,
+) -> (Option<Generics>, Option<Pair<'a, Rule>>) {
+	let (generics, next) = parse_maybe_rule(inner, Rule::def_generics);
+	(
+		generics.map(|x| {
+			let inner = x.into_inner();
+			let mut generics = Vec::new();
+			for pair in inner {
+				generics.push(Span::new(
+					pair.as_span(),
+					file.clone(),
+					pair.as_str().to_string(),
+				))
+			}
+			generics
+		}),
+		next,
+	)
+}
+
+/// Parse type generics
+fn parse_generics(inner: Pair<Rule>, file: &File) -> Vec<Span<Type>> {
+	let mut r = Vec::new();
+	for pair in inner.into_inner() {
+		r.push(parse_type(pair, file.clone()))
+	}
+	r
+}
+
+/// Parse type generics
+fn parse_where_clause(inner: Pair<Rule>, file: &File) -> WhereClause {
+	let mut r = Vec::new();
+	for pair in inner.into_inner() {
+		let mut inner = pair.into_inner();
+		let type_ = parse_type(inner.next().unwrap(), file.clone());
+		let mut traits = Vec::with_capacity(1);
+		for trait_ in inner {
+			traits.push(parse_trait(trait_, file.clone()));
+		}
+		r.push((type_, traits));
+	}
+	r
+}
+
+/// Parse function def arguments
+fn parse_fn_def_args<'a>(arguments: Pair<Rule>, file: &File) -> Vec<FnArg> {
+	let mut r = Vec::new();
+	for argument in arguments.into_inner() {
+		let mut inner = argument.into_inner();
+		let name = parse_name(&mut inner, file.clone());
+		let typ = parse_type(inner.next().unwrap(), file.clone());
+		r.push((name, typ));
+	}
+	r
+}
+/// Parse a possible pair and ignore the next pair
+fn parse_maybe_rule_matching_next<'a>(
+	inner: &'a mut Pairs<Rule>,
+	rule: Rule,
+	next_rule: Rule,
+) -> Option<Option<Pair<'a, Rule>>> {
+	let (maybe, next) = parse_maybe_rule(inner, rule);
+	if next.unwrap().as_rule() == next_rule {
+		Some(maybe)
+	} else {
+		None
+	}
+}
+
+/// Parse a possible pair and return the next one
+fn parse_maybe_rule<'a>(
+	inner: &'a mut Pairs<Rule>,
+	rule: Rule,
+) -> (Option<Pair<'a, Rule>>, Option<Pair<'a, Rule>>) {
+	let possible_pub = inner.next().unwrap();
+	match possible_pub.as_rule() {
+		x if x == rule => (Some(possible_pub), inner.next()),
+		_ => (None, Some(possible_pub)),
+	}
+}
 
 pub fn parse(file: File, fs: &Fs) -> Span<Expr> {
 	let s = fs.load_file(&file);
-	let pairs = IdentParser::parse(Rule::calculation, &s).unwrap_or_else(|e| panic!("{}", e));
+	let pairs = LamaParser::parse(Rule::calculation, &s).unwrap_or_else(|e| panic!("{}", e));
 	// tree(pairs.clone(), "");
 
-		{
-			let pairs = IdentParser::parse(
-				Rule::module,
-				r#"
-				fn hi< a, c >(a1: a) wherea: b, c: d {
-					a + b;
-					!a()() + b
-				}
-				trait Add<Other> {
-					type Target;
+	// {
+	// 	let pairs = LamaParser::parse(
+	// 		Rule::module,
+	// 		r#"
+	// 		fn hi< a, c >(a1: a) wherea: b, c: d {
+	// 			a + b;
+	// 			!a()() + b
+	// 		}
+	// 		trait Add<Other> {
+	// 			type Target;
 
-					fn add(self: Self, other: Other) -> Target;
-				}
-				impl Add<number> for number {
-					type Target = number;
-					fn add(self: Self, other: number) -> Target {
-						INTRINSIC_ADD_NUM
-					}
-				}
-				"#,
-			)
-			.unwrap_or_else(|e| panic!("{}", e));
-			tree(pairs.clone(), "");
-		}
+	// 			fn add(self: Self, other: Other) -> Target;
+	// 		}
+	// 		impl Add<number> for number {
+	// 			type Target = number;
+	// 			fn add(self: Self, other: number) -> Target {
+	// 				INTRINSIC_ADD_NUM
+	// 			}
+	// 		}
+	// 		"#,
+	// 	)
+	// 	.unwrap_or_else(|e| panic!("{}", e));
+	// 	tree(pairs.clone(), "");
+	// }
 
 	eval_expr(pairs, &file).map(|x| *x)
 }
@@ -136,7 +353,8 @@ fn parse_value(mut pairs: pest::iterators::Pairs<Rule>, file: &File) -> BoxedSpa
 		pair.as_span(),
 		file.clone(),
 		match pair.as_rule() {
-			Rule::num => Expr::Literal(Literal::Number(pair.as_str().parse::<f64>().unwrap())),
+			Rule::int => Expr::Literal(Literal::Int(pair.as_str().parse().unwrap())),
+			Rule::float => Expr::Literal(Literal::Float(pair.as_str().parse().unwrap())),
 			Rule::string_content => {
 				let s = pair.as_str();
 				Expr::Literal(Literal::String(s.to_string()))
@@ -185,11 +403,4 @@ fn parse_block(pairs: pest::iterators::Pairs<Rule>, file: &File) -> Block {
 		}
 	}
 	statements
-}
-
-fn tree<T: Display>(pairs: pest::iterators::Pairs<Rule>, space: T) {
-	for pair in pairs {
-		println!("{}{:?} [{}]", space, pair.as_rule(), pair.as_str());
-		tree(pair.into_inner(), format!("{}  ", space));
-	}
 }

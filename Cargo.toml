@@ -1,5 +1,5 @@
 [package]
-name = "lang2"
+name = "lamalang"
 version = "0.1.0"
 authors = ["ThePerkinrex <theperkinrex@gmail.com>"]
 edition = "2018"

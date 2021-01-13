@@ -1,5 +1,5 @@
 use error::Return;
-use fs::Fs;
+use fs::{File, Fs};
 
 #[macro_use]
 extern crate pest_derive;
@@ -29,9 +29,18 @@ fn wrapped_main() -> Return<()> {
 	let opt = options::Options::from_args();
 	println!("{:?}", opt);
 	let mut fs = Fs::default();
-	let statement = fs.insert_repl_statement("!1 + 1 - 2 * (2 / 3 + \"HAHA\")(1 + 2, if 1 {} else if 2 {} else {})".to_string());
-	let expr = parser::parse(statement, &fs);
-	let (codegen_opts, backend) = opt.into_codegen_options();
-	println!("> {}", backend.get_codegen().eval_expr(expr, codegen_opts)?);
+	if let Some(p) = opt.input_file {
+		let m = parser::parse_module(File::Path(p.into()), &fs);
+		println!("{:?}", m);
+		// TODO pass module to codegen
+	}else{
+		// TODO Start repl
+	}
+	// let statement = fs.insert_repl_statement(
+	// 	"!1 + 1 - 2 * (2 / 3 + \"HAHA\")(1 + 2, if 1 {} else if 2 {} else {})".to_string(),
+	// );
+	// let expr = parser::parse(statement, &fs);
+	// let (codegen_opts, backend) = opt.into_codegen_options();
+	// println!("> {}", backend.get_codegen().eval_expr(expr, codegen_opts)?);
 	Ok(())
 }

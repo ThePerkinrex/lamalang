@@ -117,7 +117,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lang2"
+name = "lamalang"
 version = "0.1.0"
 dependencies = [
  "lazy_static",

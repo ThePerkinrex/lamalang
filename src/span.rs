@@ -3,28 +3,10 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::error::{Error, ErrorCode};
-
-#[derive(Clone)]
-pub enum File {
-	Repl(usize),
-	Path(PathBuf),
-}
-
-impl Display for File {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Path(p) => write!(f, "{}", p.display()),
-			Self::Repl(i) => write!(f, "repl[{}]", i),
-		}
-	}
-}
-
-impl Debug for File {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		Display::fmt(&self, f)
-	}
-}
+use crate::{
+	error::{Error, ErrorCode},
+	fs::File,
+};
 
 #[derive(Clone)]
 pub struct Span<T> {

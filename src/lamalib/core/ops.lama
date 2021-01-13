@@ -1,0 +1,19 @@
+pub trait Add<Other> {
+	type Output;
+	fn add(self: Self, other: Other) -> Self::Output;
+}
+
+// TODO Change to isize, etc.
+impl Add<int> for int {
+	type Output = int;
+	fn add(self: Self, other: int) -> Self::Output {
+		BUILTIN_ADD_INT
+	}
+}
+
+impl Add<float> for float{
+	type Output = float;
+	fn add(self: Self, other: float) -> Self::Output {
+		BUILTIN_ADD_FLOAT
+	}
+}

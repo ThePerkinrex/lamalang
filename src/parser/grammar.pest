@@ -5,14 +5,19 @@ struct_kw = {"struct"}
 type_kw = {"type"}
 impl_kw = {"impl"}
 for_kw = {"for"}
+mod_kw = {"mod"}
+use_kw = {"use"}
 // TODO Add modules and scoped types & traits (Self::Target)
 
-ident = @{(ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
-type_name = @{ident}
-generic_type = {type_name  ~ ("<" ~ generics? ~ ">")?}
+path = {(ASCII_ALPHANUMERIC | "_")+ ~ ("::" ~ (ASCII_ALPHANUMERIC | "_")+)*}
+ident = @{(path ~ "::")? ~ (ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
+type_name = {empty_type | ident}
+generic_type = {empty_type | (ident ~ ("<" ~ generics? ~ ">")?)}
+	empty_type = {"()"}
 trait_name = @{type_name}
-generic_trait = {type_name  ~ ("<" ~ generics? ~ ">")?}
+generic_trait = {ident  ~ ("<" ~ generics? ~ ">")?}
 
+def_generics = {ident ~ ("," ~ ident)* ~ ","?}
 generics = {generic_type ~ ("," ~ generic_type)* ~ ","?}
 where_clause = {"where" ~ (generic_bound ~ ("," ~ generic_bound)*) ~ ","?}
 	generic_bound = {generic_type ~ ":" ~ generic_trait ~ ("+" ~ generic_trait)*}
@@ -21,25 +26,28 @@ fn_arguments = {(fn_arg ~ ("," ~ fn_arg)* ~ ","?)?}
 fn_return = {("->" ~ generic_type)?}
 block = {"{" ~ non_returning_statement* ~ statement? ~ "}"}
 	non_returning_statement = {expr ~ ";"}
-	statement = {expr}
+	statement = {("return" ~ expr ~ ";"?) | expr}
 
-item = _{fn_item | trait_item | struct_item | impl_trait_item | impl_item}
-	fn_item = {pub_kw? ~ fn_kw ~ ident ~ ("<" ~ generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
-	trait_item = {pub_kw? ~ trait_kw ~ trait_name ~ ("<" ~ generics? ~ ">")? ~ where_clause? ~ "{" ~ (trait_type | trait_fn)* ~ "}"}
+item = _{fn_item | trait_item | struct_item | impl_trait_item | impl_item | mod_item | use_item}
+	fn_item = {pub_kw? ~ fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
+	trait_item = {pub_kw? ~ trait_kw ~ trait_name ~ ("<" ~ def_generics? ~ ">")? ~ where_clause? ~ "{" ~ (trait_type | trait_fn)* ~ "}"}
 		trait_type = {type_kw ~ generic_type ~ (":" ~ generic_trait ~ ("+" ~ generic_trait)*)? ~ ";"}
-		trait_fn = {fn_kw ~ ident ~ ("<" ~ generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ (block | ";")}
+		trait_fn = {fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ (block | ";")}
 	struct_item = {pub_kw? ~ struct_kw ~ type_name ~ ("<" ~ generics? ~ ">")? ~ where_clause? ~ "{" ~ fn_arguments ~ "}"}
-	impl_trait_item = {impl_kw ~ ("<" ~ generics? ~ ">")? ~ generic_trait ~ for_kw ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
-	impl_item = {impl_kw ~ ("<" ~ generics? ~ ">")? ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
+	impl_trait_item = {impl_kw ~ ("<" ~ def_generics? ~ ">")? ~ generic_trait ~ for_kw ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
+	impl_item = {impl_kw ~ ("<" ~ def_generics? ~ ">")? ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
 		impl_type = {type_kw ~ generic_type ~ "=" ~ generic_type ~ ";"}
-		impl_fn = {fn_kw ~ ident ~ ("<" ~ generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
+		impl_fn = {fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
+	mod_item = {pub_kw? ~ mod_kw ~ ident ~ ";"}
+	use_item = {pub_kw? ~ use_kw ~ path ~ ";"}
 
 module = _{SOI ~ (item)* ~ EOI}
 
 
-value = { if_statement | num | string | ident }
-	num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
-		int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+value = { if_statement | int | float | string | ident }
+	int = @{ inner_int ~ (^"e" ~ inner_int)?}
+	float = @{ inner_int ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ inner_int)? }
+		inner_int = { ("+" | "-")? ~ ASCII_DIGIT+ }
 	string = _{ "\"" ~ string_content ~ "\"" }
 		string_content = @{("\\\"" | (!"\"" ~ ANY))*}
 	if_statement = {"if" ~ expr ~ block ~ elseif_clause* ~ else_clause?}
@@ -64,3 +72,4 @@ term = {unary* ~ ("(" ~ expr ~ ")" | value) ~ fn_call*}
 calculation = _{ SOI ~ expr ~ EOI }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE) }
