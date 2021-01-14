@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use error::Return;
 use fs::{File, Fs};
 
@@ -8,8 +10,8 @@ extern crate lazy_static;
 
 mod ast;
 mod backend;
-mod parser;
 mod modules;
+mod parser;
 
 mod error;
 mod fs;
@@ -29,12 +31,19 @@ fn main() {
 fn wrapped_main() -> Return<()> {
 	let opt = options::Options::from_args();
 	println!("{:?}", opt);
-	let mut fs = Fs::default();
+	let fs = Fs::default();
 	if let Some(p) = opt.input_file {
-		let m = parser::parse_module(File::Path(p.into()), &fs);
+		let p: PathBuf = p;
+		let file = File::Path(p.clone());
+		let m = parser::parse_module(file.clone(), &fs);
 		println!("{:?}", m);
-		// TODO pass module to codegen
-	}else{
+		let module_tree = modules::ModuleTree::new(
+			Default::default(),
+			modules::build_tree(&fs, &file, p.file_stem().unwrap().to_str().unwrap(), m, false)?,
+		);
+		println!("{:?}", module_tree.root);
+	// TODO pass module to codegen
+	} else {
 		// TODO Start repl
 	}
 	// let statement = fs.insert_repl_statement(

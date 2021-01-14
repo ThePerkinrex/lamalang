@@ -7,7 +7,7 @@ use pest::{
 
 use crate::{
 	ast::{
-		Block, Expr, FnArg, FnDef, Generics, Literal, Mod, AstModule, Statement, Trait, Type,
+		AstModule, Block, Expr, FnArg, FnDef, Generics, Literal, Mod, Statement, Trait, Type,
 		WhereClause,
 	},
 	fs::{File, Fs},
@@ -228,38 +228,38 @@ fn parse_maybe_rule<'a>(
 	}
 }
 
-pub fn parse(file: File, fs: &Fs) -> Span<Expr> {
-	let s = fs.load_file(&file);
-	let pairs = LamaParser::parse(Rule::calculation, &s).unwrap_or_else(|e| panic!("{}", e));
-	// tree(pairs.clone(), "");
+// pub fn parse(file: File, fs: &Fs) -> Span<Expr> {
+// 	let s = fs.load_file(&file);
+// 	let pairs = LamaParser::parse(Rule::calculation, &s).unwrap_or_else(|e| panic!("{}", e));
+// 	// tree(pairs.clone(), "");
 
-	// {
-	// 	let pairs = LamaParser::parse(
-	// 		Rule::module,
-	// 		r#"
-	// 		fn hi< a, c >(a1: a) wherea: b, c: d {
-	// 			a + b;
-	// 			!a()() + b
-	// 		}
-	// 		trait Add<Other> {
-	// 			type Target;
+// 	// {
+// 	// 	let pairs = LamaParser::parse(
+// 	// 		Rule::module,
+// 	// 		r#"
+// 	// 		fn hi< a, c >(a1: a) wherea: b, c: d {
+// 	// 			a + b;
+// 	// 			!a()() + b
+// 	// 		}
+// 	// 		trait Add<Other> {
+// 	// 			type Target;
 
-	// 			fn add(self: Self, other: Other) -> Target;
-	// 		}
-	// 		impl Add<number> for number {
-	// 			type Target = number;
-	// 			fn add(self: Self, other: number) -> Target {
-	// 				INTRINSIC_ADD_NUM
-	// 			}
-	// 		}
-	// 		"#,
-	// 	)
-	// 	.unwrap_or_else(|e| panic!("{}", e));
-	// 	tree(pairs.clone(), "");
-	// }
+// 	// 			fn add(self: Self, other: Other) -> Target;
+// 	// 		}
+// 	// 		impl Add<number> for number {
+// 	// 			type Target = number;
+// 	// 			fn add(self: Self, other: number) -> Target {
+// 	// 				INTRINSIC_ADD_NUM
+// 	// 			}
+// 	// 		}
+// 	// 		"#,
+// 	// 	)
+// 	// 	.unwrap_or_else(|e| panic!("{}", e));
+// 	// 	tree(pairs.clone(), "");
+// 	// }
 
-	eval_expr(pairs, &file).map(|x| *x)
-}
+// 	eval_expr(pairs, &file).map(|x| *x)
+// }
 
 lazy_static! {
 	static ref PREC_CLIMBER: pest::prec_climber::PrecClimber<Rule> = {
@@ -382,7 +382,10 @@ fn parse_value(mut pairs: pest::iterators::Pairs<Rule>, file: &File) -> BoxedSpa
 				}
 				Expr::If(condition, block, elseif_clauses, else_clause)
 			}
-			_ => unreachable!(),
+			Rule::ident => {
+				Expr::Ident(pair.as_str().to_string())
+			}
+			x => unreachable!("Unexpected value: {:?}", x),
 		},
 	)
 }

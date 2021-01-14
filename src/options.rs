@@ -8,7 +8,7 @@ use structopt::StructOpt;
 #[structopt()]
 pub struct Options {
 	/// Path to the entry point for compilation or execution (leave empty for repl)
-	pub input_file: Option<String>,
+	pub input_file: Option<PathBuf>,
 	/// Is it a library (has no main function)
 	#[structopt(short, long)]
 	pub lib: bool,
@@ -23,19 +23,24 @@ pub struct Options {
 	///
 	/// Ie. `--extern std=/path/to/std --extern core=/path/to/core`
 	#[structopt(name = "external library", long = "extern", parse(from_str = externlib_from_str), number_of_values(1), validator(validate_externlib))]
-	external: Vec<(String, String)>
+	external: Vec<(String, String)>,
 }
 
 fn externlib_from_str(s: &str) -> (String, String) {
 	let mut s = s.split("=");
-	(s.next().unwrap().to_string(), s.collect::<Vec<&str>>().join("="))
+	(
+		s.next().unwrap().to_string(),
+		s.collect::<Vec<&str>>().join("="),
+	)
 }
 
 fn validate_externlib(s: String) -> Result<(), String> {
 	if s.contains("=") {
 		Ok(())
-	}else {
-		Err(format!("--extern option should contain a `=` to separate the library name and its entry point"))
+	} else {
+		Err(format!(
+			"--extern option should contain a `=` to separate the library name and its entry point"
+		))
 	}
 }
 

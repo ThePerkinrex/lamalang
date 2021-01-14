@@ -51,6 +51,14 @@ impl<T> Span<T> {
 		}
 	}
 
+	pub fn new_ref<'a, U, F: FnOnce(&'a U) -> T>(other: &'a Span<U>, f: F) -> Self {
+		Self {
+			content: f(&other.content),
+			file: other.file.clone(),
+			range: other.range,
+		}
+	}
+
 	pub fn new_from_inner<'a, S: 'a>(inner: &'a [S], file: File, content: T) -> Self
 	where
 		RangedPosition: From<&'a S>,
@@ -133,6 +141,10 @@ impl<T> Span<T> {
 
 	pub fn into_error<S: ToString>(self, error_code: ErrorCode, message: S) -> Error {
 		Error::new(error_code, self.map(|_| ()), message.to_string())
+	}
+
+	pub fn into_inner(self) -> T {
+		self.content
 	}
 }
 

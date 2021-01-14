@@ -2,15 +2,15 @@ use crate::span::{BoxedSpan, Span};
 
 #[derive(Debug)]
 pub struct AstModule {
-	mods: Vec<Mod>,
-	fns: Vec<FnDef>
+	pub mods: Vec<Mod>,
+	pub fns: Vec<FnDef>,
 }
 
 impl AstModule {
-    pub fn new(mods: Vec<Mod>, fns: Vec<FnDef>) -> Self { Self { mods, fns } }
+	pub fn new(mods: Vec<Mod>, fns: Vec<FnDef>) -> Self {
+		Self { mods, fns }
+	}
 }
-
-
 
 #[derive(Debug)]
 pub struct Mod {
@@ -26,7 +26,7 @@ pub struct FnDef {
 	pub where_clause: Option<WhereClause>,
 	pub args: Vec<FnArg>,
 	pub return_type: Span<Type>,
-	pub body: Span<Block>
+	pub body: Span<Block>,
 }
 
 #[derive(Debug)]
@@ -37,13 +37,13 @@ pub enum Type {
 	Other {
 		name: Span<String>,
 		generics: Vec<Span<Type>>,
-	}
+	},
 }
 
 impl Default for Type {
-    fn default() -> Self {
-        Self::Empty
-    }
+	fn default() -> Self {
+		Self::Empty
+	}
 }
 
 #[derive(Debug)]
@@ -81,6 +81,7 @@ pub enum Expr {
 		Vec<(BoxedSpan<Expr>, Block)>,
 		Option<Block>,
 	),
+	Ident(String)
 }
 
 #[derive(Debug)]

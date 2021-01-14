@@ -4,7 +4,10 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::{error::{ErrorCode, Return}, span::Span};
+use crate::{
+	error::{ErrorCode, Return},
+	span::Span,
+};
 
 #[derive(Clone)]
 pub enum File {
@@ -47,30 +50,35 @@ impl Fs {
 		}
 	}
 
-	pub fn find_child(&self, file: &File, current: String, name: Span<String>) -> Return<File> {
+	pub fn find_child(&self, file: &File, current: &str, name: Span<&str>) -> Return<File> {
 		let root = match file {
 			File::Repl(_) => PathBuf::new(),
 			File::Path(p) => p.parent().unwrap().to_path_buf(),
 		};
+		let name_str: &str = name.as_ref();
 		// Has file `name.lama`?
 		let single_file = root.join(format!("{}.lama", name));
 		if single_file.exists() {
 			Ok(File::Path(single_file))
 		} else {
-			let mod_file = root.join(name.as_str()).join("mod.lama");
+			let mod_file = root.join(name_str).join("mod.lama");
 			if mod_file.exists() {
 				Ok(File::Path(mod_file))
 			} else {
-				let folder_root = root.join(name.as_str());
+				let folder_root = root.join(current);
 				let single_file = folder_root.join(format!("{}.lama", name));
 				if single_file.exists() {
 					Ok(File::Path(single_file))
 				} else {
-					let mod_file = folder_root.join(name.as_str()).join("mod.lama");
+					let mod_file = folder_root.join(name_str).join("mod.lama");
 					if mod_file.exists() {
 						Ok(File::Path(mod_file))
 					} else {
-						name.as_error(ErrorCode::ModuleNotFoundError, format!("Module `{}` not found", name)).display()?;
+						name.as_error(
+							ErrorCode::ModuleNotFoundError,
+							format!("Module `{}` not found relative to {}", name, current),
+						)
+						.display()?;
 						unreachable!()
 					}
 				}
