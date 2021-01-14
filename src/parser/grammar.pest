@@ -44,7 +44,7 @@ item = _{fn_item | trait_item | struct_item | impl_trait_item | impl_item | mod_
 module = _{SOI ~ (item)* ~ EOI}
 
 
-value = { if_statement | int | float | string | ident }
+value = { if_statement | int | float | string | ident } // TODO Change ident for path
 	int = @{ inner_int ~ (^"e" ~ inner_int)?}
 	float = @{ inner_int ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ inner_int)? }
 		inner_int = { ("+" | "-")? ~ ASCII_DIGIT+ }
