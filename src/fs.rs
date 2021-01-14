@@ -1,9 +1,15 @@
-use std::{collections::HashMap, fmt::{Display, Debug}, fs::read_to_string, path::PathBuf, rc::Rc};
+use std::{
+	fmt::{Debug, Display},
+	fs::read_to_string,
+	path::PathBuf,
+};
+
+use crate::{error::{ErrorCode, Return}, span::Span};
 
 #[derive(Clone)]
 pub enum File {
 	Repl(usize),
-	Path(PathBuf)
+	Path(PathBuf),
 }
 
 impl Display for File {
@@ -37,7 +43,38 @@ impl Fs {
 		println!("{:?}", file);
 		match file {
 			File::Repl(i) => self.repl[*i].clone(),
-			File::Path(p) => read_to_string(p).unwrap()
+			File::Path(p) => read_to_string(p).unwrap(),
+		}
+	}
+
+	pub fn find_child(&self, file: &File, current: String, name: Span<String>) -> Return<File> {
+		let root = match file {
+			File::Repl(_) => PathBuf::new(),
+			File::Path(p) => p.parent().unwrap().to_path_buf(),
+		};
+		// Has file `name.lama`?
+		let single_file = root.join(format!("{}.lama", name));
+		if single_file.exists() {
+			Ok(File::Path(single_file))
+		} else {
+			let mod_file = root.join(name.as_str()).join("mod.lama");
+			if mod_file.exists() {
+				Ok(File::Path(mod_file))
+			} else {
+				let folder_root = root.join(name.as_str());
+				let single_file = folder_root.join(format!("{}.lama", name));
+				if single_file.exists() {
+					Ok(File::Path(single_file))
+				} else {
+					let mod_file = folder_root.join(name.as_str()).join("mod.lama");
+					if mod_file.exists() {
+						Ok(File::Path(mod_file))
+					} else {
+						name.as_error(ErrorCode::ModuleNotFoundError, format!("Module `{}` not found", name)).display()?;
+						unreachable!()
+					}
+				}
+			}
 		}
 	}
 }

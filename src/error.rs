@@ -6,7 +6,8 @@ use crate::span::Span;
 #[derive(Debug, Clone, Copy)]
 pub enum ErrorCode {
 	// Error
-	ErrorTest,
+	ModuleNotFoundError,
+	NoMainError,
 	// Warn
 	WarnTest,
 	// Info
@@ -17,7 +18,8 @@ impl ErrorCode {
 	fn get_kind(&self) -> ErrorKind {
 		use ErrorCode::*;
 		match self {
-			ErrorTest => ErrorKind::Error,
+			ModuleNotFoundError => ErrorKind::Error,
+			NoMainError => ErrorKind::Error,
 			WarnTest => ErrorKind::Warn,
 			InfoTest => ErrorKind::Info,
 		}

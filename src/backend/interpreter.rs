@@ -12,7 +12,7 @@ impl super::Backend for Codegen {
 		if options.lib {
 			// Error (No main)
 			NonLocatedError::new(
-				ErrorCode::ErrorTest,
+				ErrorCode::NoMainError,
 				"Can't interpret library as it has no entry point".to_string(),
 			)
 			.display()?;
