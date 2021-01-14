@@ -5,7 +5,7 @@ use super::backend;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "testlang")]
+#[structopt()]
 pub struct Options {
 	/// Path to the entry point for compilation or execution (leave empty for repl)
 	pub input_file: Option<String>,
@@ -18,6 +18,25 @@ pub struct Options {
 	/// Backend to use, interpret doesn't use the out file, as it doesn't perform any kind of codegen
 	#[structopt(name = "backend", short, long, default_value, possible_values(&Backend::variants()))]
 	backend: Backend,
+
+	/// Contains a `=` to separate the library name and its entry point. Can appear multiple times
+	///
+	/// Ie. `--extern std=/path/to/std --extern core=/path/to/core`
+	#[structopt(name = "external library", long = "extern", parse(from_str = externlib_from_str), number_of_values(1), validator(validate_externlib))]
+	external: Vec<(String, String)>
+}
+
+fn externlib_from_str(s: &str) -> (String, String) {
+	let mut s = s.split("=");
+	(s.next().unwrap().to_string(), s.collect::<Vec<&str>>().join("="))
+}
+
+fn validate_externlib(s: String) -> Result<(), String> {
+	if s.contains("=") {
+		Ok(())
+	}else {
+		Err(format!("--extern option should contain a `=` to separate the library name and its entry point"))
+	}
 }
 
 impl Options {

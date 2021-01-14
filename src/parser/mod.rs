@@ -7,7 +7,7 @@ use pest::{
 
 use crate::{
 	ast::{
-		Block, Expr, FnArg, FnDef, Generics, Literal, Mod, Module, Statement, Trait, Type,
+		Block, Expr, FnArg, FnDef, Generics, Literal, Mod, AstModule, Statement, Trait, Type,
 		WhereClause,
 	},
 	fs::{File, Fs},
@@ -25,7 +25,7 @@ fn tree<T: Display>(pairs: Pairs<Rule>, space: T) {
 	}
 }
 
-pub fn parse_module(file: File, fs: &Fs) -> Module {
+pub fn parse_module(file: File, fs: &Fs) -> AstModule {
 	let s = fs.load_file(&file);
 	let pairs = LamaParser::parse(Rule::module, &s).unwrap_or_else(|e| panic!("{}", e));
 	tree(pairs.clone(), "");
@@ -57,7 +57,6 @@ pub fn parse_module(file: File, fs: &Fs) -> Module {
 				} else {
 					(None, possible_where)
 				};
-				// TODO parse possible where clause
 				let body = Span::new(
 					body.as_span(),
 					file.clone(),
@@ -82,7 +81,7 @@ pub fn parse_module(file: File, fs: &Fs) -> Module {
 			_ => unreachable!(),
 		}
 	}
-	Module::new(mod_items, fn_items)
+	AstModule::new(mod_items, fn_items)
 }
 
 /// Parse a possible pub keyword and ignore the next pair

@@ -11,7 +11,7 @@ use_kw = {"use"}
 
 path = {(ASCII_ALPHANUMERIC | "_")+ ~ ("::" ~ (ASCII_ALPHANUMERIC | "_")+)*}
 ident = @{(path ~ "::")? ~ (ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
-type_name = {empty_type | ident}
+type_name = @{ident}
 generic_type = {empty_type | (ident ~ ("<" ~ generics? ~ ">")?)}
 	empty_type = {"()"}
 trait_name = @{type_name}

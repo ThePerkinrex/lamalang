@@ -9,6 +9,7 @@ extern crate lazy_static;
 mod ast;
 mod backend;
 mod parser;
+mod modules;
 
 mod error;
 mod fs;

@@ -1,12 +1,12 @@
 use crate::span::{BoxedSpan, Span};
 
 #[derive(Debug)]
-pub struct Module {
+pub struct AstModule {
 	mods: Vec<Mod>,
 	fns: Vec<FnDef>
 }
 
-impl Module {
+impl AstModule {
     pub fn new(mods: Vec<Mod>, fns: Vec<FnDef>) -> Self { Self { mods, fns } }
 }
 
