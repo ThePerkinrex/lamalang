@@ -7,11 +7,13 @@ impl_kw = {"impl"}
 for_kw = {"for"}
 mod_kw = {"mod"}
 use_kw = {"use"}
-// TODO Add modules and scoped types & traits (Self::Target)
 
-path = {(ASCII_ALPHANUMERIC | "_")+ ~ ("::" ~ (ASCII_ALPHANUMERIC | "_")+)*}
-ident = @{(path ~ "::")? ~ (ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
-type_name = @{ident}
+path = _{path_part ~ ("::" ~ path_part)*}
+	path_part = {(ASCII_ALPHANUMERIC | "_")+}
+ident = {path}
+	ident_part = {(ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
+type_name = @{ident_part}
+generic_def_type = {type_name ~ ("<" ~ def_generics? ~ ">")?}
 generic_type = {empty_type | (ident ~ ("<" ~ generics? ~ ">")?)}
 	empty_type = {"()"}
 trait_name = @{type_name}
@@ -29,22 +31,22 @@ block = {"{" ~ non_returning_statement* ~ statement? ~ "}"}
 	statement = {("return" ~ expr ~ ";"?) | expr}
 
 item = _{fn_item | trait_item | struct_item | impl_trait_item | impl_item | mod_item | use_item}
-	fn_item = {pub_kw? ~ fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
+	fn_item = {pub_kw? ~ fn_kw ~ ident_part ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
 	trait_item = {pub_kw? ~ trait_kw ~ trait_name ~ ("<" ~ def_generics? ~ ">")? ~ where_clause? ~ "{" ~ (trait_type | trait_fn)* ~ "}"}
-		trait_type = {type_kw ~ generic_type ~ (":" ~ generic_trait ~ ("+" ~ generic_trait)*)? ~ ";"}
-		trait_fn = {fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ (block | ";")}
-	struct_item = {pub_kw? ~ struct_kw ~ type_name ~ ("<" ~ generics? ~ ">")? ~ where_clause? ~ "{" ~ fn_arguments ~ "}"}
+		trait_type = {type_kw ~ generic_def_type ~ (":" ~ generic_trait ~ ("+" ~ generic_trait)*)? ~ ";"}
+		trait_fn = {fn_kw ~ ident_part ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ (block | ";")}
+	struct_item = {pub_kw? ~ struct_kw ~ type_name ~ ("<" ~ def_generics? ~ ">")? ~ where_clause? ~ "{" ~ fn_arguments ~ "}"}
 	impl_trait_item = {impl_kw ~ ("<" ~ def_generics? ~ ">")? ~ generic_trait ~ for_kw ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
 	impl_item = {impl_kw ~ ("<" ~ def_generics? ~ ">")? ~ generic_type ~ where_clause? ~ "{" ~ (impl_type | impl_fn)* ~ "}"}
-		impl_type = {type_kw ~ generic_type ~ "=" ~ generic_type ~ ";"}
-		impl_fn = {fn_kw ~ ident ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
+		impl_type = {type_kw ~ generic_def_type ~ "=" ~ generic_type ~ ";"}
+		impl_fn = {fn_kw ~ ident_part ~ ("<" ~ def_generics? ~ ">")? ~ "(" ~ fn_arguments ~ ")" ~ fn_return ~ where_clause? ~ block}
 	mod_item = {pub_kw? ~ mod_kw ~ ident ~ ";"}
 	use_item = {pub_kw? ~ use_kw ~ path ~ ";"}
 
 module = _{SOI ~ (item)* ~ EOI}
 
 
-value = { if_statement | int | float | string | ident } // TODO Change ident for path
+value = { ident | if_statement | int | float | string }
 	int = @{ inner_int ~ (^"e" ~ inner_int)?}
 	float = @{ inner_int ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ inner_int)? }
 		inner_int = { ("+" | "-")? ~ ASCII_DIGIT+ }
@@ -68,8 +70,6 @@ unary = {not}
 expr = {(term ~ (operation ~ term)*)}
 term = {unary* ~ ("(" ~ expr ~ ")" | value) ~ fn_call*}
 	fn_call = { "(" ~ (expr ~ ("," ~ expr)* ~ ","?)? ~ ")"}
-
-calculation = _{ SOI ~ expr ~ EOI }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE) }

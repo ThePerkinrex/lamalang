@@ -23,7 +23,10 @@ pub struct Options {
 	///
 	/// Ie. `--extern std=/path/to/std --extern core=/path/to/core`
 	#[structopt(name = "external library", long = "extern", parse(from_str = externlib_from_str), number_of_values(1), validator(validate_externlib))]
-	external: Vec<(String, String)>,
+	pub external: Vec<(String, String)>,
+
+	#[structopt(name = "no-std", long)]
+	pub no_std: bool
 }
 
 fn externlib_from_str(s: &str) -> (String, String) {

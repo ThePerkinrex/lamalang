@@ -43,7 +43,7 @@ impl Fs {
 	}
 
 	pub fn load_file<'a>(&self, file: &File) -> String {
-		println!("{:?}", file);
+		// println!("{:?}", file);
 		match file {
 			File::Repl(i) => self.repl[*i].clone(),
 			File::Path(p) => read_to_string(p).unwrap(),

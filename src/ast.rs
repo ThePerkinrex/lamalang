@@ -4,13 +4,16 @@ use crate::span::{BoxedSpan, Span};
 pub struct AstModule {
 	pub mods: Vec<Mod>,
 	pub fns: Vec<FnDef>,
+	pub trait_defs: Vec<TraitDef>,
+	pub trait_impls: Vec<TraitImpl>,
+	pub impls: Vec<Impl>
 }
 
-impl AstModule {
-	pub fn new(mods: Vec<Mod>, fns: Vec<FnDef>) -> Self {
-		Self { mods, fns }
-	}
-}
+// impl AstModule {
+// 	pub fn new(mods: Vec<Mod>, fns: Vec<FnDef>, trait_defs: Vec<TraitDef>) -> Self {
+// 		Self { mods, fns, trait_defs }
+// 	}
+// }
 
 #[derive(Debug)]
 pub struct Mod {
@@ -27,6 +30,60 @@ pub struct FnDef {
 	pub args: Vec<FnArg>,
 	pub return_type: Span<Type>,
 	pub body: Span<Block>,
+}
+
+#[derive(Debug)]
+pub struct FnSignatureDef {
+	pub pub_kw: Option<Span<()>>,
+	pub name: Span<String>,
+	pub generics: Option<Generics>,
+	pub where_clause: Option<WhereClause>,
+	pub args: Vec<FnArg>,
+	pub return_type: Span<Type>,
+}
+
+#[derive(Debug)]
+pub struct TraitDef {
+	pub pub_kw: Option<Span<()>>,
+	pub name: Span<String>,
+	pub generics: Option<Generics>,
+	pub where_clause: Option<WhereClause>,
+	pub fn_defs: Vec<FnDef>,
+	pub fn_signatures: Vec<FnSignatureDef>,
+	pub types: Vec<(Span<TypeInTrait>, Vec<Span<Trait>>)>
+}
+
+#[derive(Debug)]
+pub struct TraitImpl {
+	pub generics: Option<Generics>,
+	pub trait_: Span<Trait>,
+	pub type_: Span<Type>,
+	pub where_clause: Option<WhereClause>,
+	pub fn_defs: Vec<FnDef>,
+	pub types: Vec<(Span<TypeInTrait>, Span<Type>)>
+}
+
+#[derive(Debug)]
+pub struct Impl {
+	pub generics: Option<Generics>,
+	pub type_: Span<Type>,
+	pub where_clause: Option<WhereClause>,
+	pub fn_defs: Vec<FnDef>,
+	pub types: Vec<(Span<TypeInTrait>, Span<Type>)>
+}
+
+impl Impl {
+	pub fn to_trait_impl(self, trait_: Span<Trait>) -> TraitImpl {
+		TraitImpl {
+		    generics: self.generics,
+		    trait_,
+		    type_: self.type_,
+		    where_clause: self.where_clause,
+		    fn_defs: self.fn_defs,
+		    types: self.types,
+
+		}
+	}
 }
 
 #[derive(Debug)]
@@ -50,6 +107,12 @@ impl Default for Type {
 pub struct Trait {
 	pub name: Span<String>,
 	pub generics: Vec<Span<Type>>,
+}
+
+#[derive(Debug)]
+pub struct TypeInTrait {
+	pub name: Span<String>,
+	pub generics: Vec<Span<String>>,
 }
 
 pub type Generics = Vec<Span<String>>;
@@ -81,7 +144,7 @@ pub enum Expr {
 		Vec<(BoxedSpan<Expr>, Block)>,
 		Option<Block>,
 	),
-	Ident(String)
+	Ident(Vec<Span<String>>),
 }
 
 #[derive(Debug)]

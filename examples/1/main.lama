@@ -1,5 +1,5 @@
 pub mod other;
 
 fn main() -> int {
-	add(1, 1)
+	other::add(1, 1)
 }

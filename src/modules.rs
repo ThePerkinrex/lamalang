@@ -19,7 +19,7 @@ impl ModuleTree {
 }
 
 pub struct Module {
-	ast: AstModule,
+	pub ast: AstModule,
 	children: HashMap<String, (bool, Module)>,
 	allow_builtins: bool,
 }

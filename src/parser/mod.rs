@@ -7,8 +7,8 @@ use pest::{
 
 use crate::{
 	ast::{
-		AstModule, Block, Expr, FnArg, FnDef, Generics, Literal, Mod, Statement, Trait, Type,
-		WhereClause,
+		AstModule, Block, Expr, FnArg, FnDef, FnSignatureDef, Generics, Impl, Literal, Mod,
+		Statement, Trait, TraitDef, Type, TypeInTrait, WhereClause,
 	},
 	fs::{File, Fs},
 	span::{BoxedSpan, Span},
@@ -28,9 +28,12 @@ fn tree<T: Display>(pairs: Pairs<Rule>, space: T) {
 pub fn parse_module(file: File, fs: &Fs) -> AstModule {
 	let s = fs.load_file(&file);
 	let pairs = LamaParser::parse(Rule::module, &s).unwrap_or_else(|e| panic!("{}", e));
-	tree(pairs.clone(), "");
+	// tree(pairs.clone(), "");
 	let mut mod_items = Vec::new();
 	let mut fn_items = Vec::new();
+	let mut trait_defs = Vec::new();
+	let mut trait_impls = Vec::new();
+	let mut impls = Vec::new();
 	for pair in pairs {
 		match pair.as_rule() {
 			Rule::EOI => (),
@@ -78,10 +81,245 @@ pub fn parse_module(file: File, fs: &Fs) -> AstModule {
 				let name = parse_name(&mut inner, file.clone());
 				mod_items.push(Mod { pub_kw, name })
 			}
+			Rule::trait_item => {
+				let mut inner = pair.into_inner();
+				let pub_kw = parse_pub(&mut inner, Rule::trait_kw, file.clone());
+				let name = parse_name(&mut inner, file.clone());
+				let (generics, next) = parse_def_generics(&mut inner, &file);
+				let possible_where = next.unwrap();
+				let (where_clause, next) = if possible_where.as_rule() == Rule::where_clause {
+					(
+						Some(parse_where_clause(possible_where, &file)),
+						inner.next().unwrap(),
+					)
+				} else {
+					(None, possible_where)
+				};
+				let mut fn_signatures = Vec::new();
+				let mut fn_defs = Vec::new();
+				let mut types = Vec::new();
+
+				parse_trait_item(next, &file, &mut types, &mut fn_signatures, &mut fn_defs);
+				for pair in inner {
+					parse_trait_item(pair, &file, &mut types, &mut fn_signatures, &mut fn_defs);
+				}
+				trait_defs.push(TraitDef {
+					pub_kw,
+					name,
+					generics,
+					where_clause,
+					fn_defs,
+					fn_signatures,
+					types,
+				});
+				// println!("TRAITS: {:?}", trait_defs);
+			}
+			Rule::impl_trait_item => {
+				let mut inner = pair.into_inner();
+				inner.next().unwrap(); // Ignore impl kw
+				let (generics, next) = parse_def_generics(&mut inner, &file);
+				let trait_ = parse_trait(next.unwrap(), file.clone());
+				inner.next().unwrap(); // Ignore for kw
+				let type_ = parse_type(inner.next().unwrap(), file.clone());
+
+				let where_clause = if inner.peek().unwrap().as_rule() == Rule::where_clause {
+					Some(parse_where_clause(inner.next().unwrap(), &file))
+				} else {
+					None
+				};
+				let trait_impl = parse_impl_inner(inner, &file, type_, generics, where_clause)
+					.to_trait_impl(trait_);
+				trait_impls.push(trait_impl);
+			}
+			Rule::impl_item => {
+				let mut inner = pair.into_inner();
+				inner.next().unwrap(); // Ignore impl kw
+				let (generics, next) = parse_def_generics(&mut inner, &file);
+				// let trait_ = parse_trait(next.unwrap(), file.clone());
+				// inner.next().unwrap(); // Ignore for kw
+				let type_ = parse_type(next.unwrap(), file.clone());
+
+				let where_clause = if inner.peek().unwrap().as_rule() == Rule::where_clause {
+					Some(parse_where_clause(inner.next().unwrap(), &file))
+				} else {
+					None
+				};
+				let impl_ = parse_impl_inner(inner, &file, type_, generics, where_clause);
+				impls.push(impl_);
+			}
+			x => unreachable!("Unknown item: {:?}", x),
+		}
+	}
+	AstModule {
+		mods: mod_items,
+		fns: fn_items,
+		trait_defs,
+		trait_impls,
+		impls,
+	}
+}
+
+fn parse_impl_inner(
+	pairs: Pairs<Rule>,
+	file: &File,
+	type_: Span<Type>,
+	generics: Option<Generics>,
+	where_clause: Option<WhereClause>,
+) -> Impl {
+	let mut fn_defs = Vec::new();
+	let mut types = Vec::new();
+	for item in pairs {
+		// println!("{:?}", item.as_rule());
+		match item.as_rule() {
+			Rule::impl_type => {
+				let mut inner = item.into_inner();
+				inner.next().unwrap(); // Ignore the type_kw
+				let type_def = {
+					let inner = inner.next().unwrap();
+					let span = inner.as_span();
+					let mut inner = inner.into_inner();
+					let name = parse_name(&mut inner, file.clone());
+					let generics = inner
+						.map(|pair| {
+							Span::new(pair.as_span(), file.clone(), pair.as_str().to_string())
+						})
+						.collect();
+					Span::new(span, file.clone(), TypeInTrait { name, generics })
+				};
+				let type_ = parse_type(inner.next().unwrap(), file.clone());
+				types.push((type_def, type_))
+			}
+			Rule::impl_fn => {
+				let mut inner = item.into_inner();
+				let pub_kw = parse_pub(&mut inner, Rule::fn_kw, file.clone());
+				let name = parse_name(&mut inner, file.clone());
+				let (generics, next) = parse_def_generics(&mut inner, &file);
+				let args = parse_fn_def_args(next.unwrap(), &file);
+				let return_type = {
+					let next = inner.next().unwrap();
+					let span = next.as_span();
+					next.into_inner()
+						.next()
+						.map(|x| parse_type(x, file.clone()))
+						.unwrap_or(Span::new(span, file.clone(), Type::Empty))
+				};
+				let possible_where = inner.next().unwrap();
+				let (where_clause, body) = if possible_where.as_rule() == Rule::where_clause {
+					(
+						Some(parse_where_clause(possible_where, &file)),
+						inner.next().unwrap(),
+					)
+				} else {
+					(None, possible_where)
+				};
+				let body = Span::new(
+					body.as_span(),
+					file.clone(),
+					parse_block(body.into_inner(), &file),
+				);
+				fn_defs.push(FnDef {
+					pub_kw,
+					name,
+					generics,
+					args,
+					return_type,
+					where_clause,
+					body,
+				})
+			}
 			_ => unreachable!(),
 		}
 	}
-	AstModule::new(mod_items, fn_items)
+	Impl {
+		generics,
+		type_,
+		where_clause,
+		fn_defs,
+		types,
+	}
+}
+
+fn parse_trait_item(
+	pair: Pair<Rule>,
+	file: &File,
+	types: &mut Vec<(Span<TypeInTrait>, Vec<Span<Trait>>)>,
+	fn_signatures: &mut Vec<FnSignatureDef>,
+	fn_defs: &mut Vec<FnDef>,
+) {
+	match pair.as_rule() {
+		Rule::trait_type => {
+			let mut inner = pair.into_inner();
+			inner.next().unwrap(); // Ignore the type_kw
+			let type_def = {
+				let inner = inner.next().unwrap();
+				let span = inner.as_span();
+				let mut inner = inner.into_inner();
+				let name = parse_name(&mut inner, file.clone());
+				let generics = inner
+					.map(|pair| Span::new(pair.as_span(), file.clone(), pair.as_str().to_string()))
+					.collect();
+				Span::new(span, file.clone(), TypeInTrait { name, generics })
+			};
+			let traits = inner.map(|pair| parse_trait(pair, file.clone())).collect();
+			types.push((type_def, traits))
+		}
+		Rule::trait_fn => {
+			let mut inner = pair.into_inner();
+			let pub_kw = parse_pub(&mut inner, Rule::fn_kw, file.clone());
+			let name = parse_name(&mut inner, file.clone());
+			let (generics, next) = parse_def_generics(&mut inner, &file);
+			let args = parse_fn_def_args(next.unwrap(), &file);
+			let return_type = {
+				let next = inner.next().unwrap();
+				let span = next.as_span();
+				next.into_inner()
+					.next()
+					.map(|x| parse_type(x, file.clone()))
+					.unwrap_or(Span::new(span, file.clone(), Type::Empty))
+			};
+			let (where_clause, body) = if let Some(possible_where) = inner.next() {
+				if possible_where.as_rule() == Rule::where_clause {
+					(
+						Some(parse_where_clause(possible_where, &file)),
+						inner.next(),
+					)
+				} else {
+					(None, Some(possible_where))
+				}
+			} else {
+				(None, None)
+			};
+			let body = body.map(|body| {
+				Span::new(
+					body.as_span(),
+					file.clone(),
+					parse_block(body.into_inner(), &file),
+				)
+			});
+
+			if let Some(body) = body {
+				fn_defs.push(FnDef {
+					pub_kw,
+					name,
+					generics,
+					args,
+					return_type,
+					where_clause,
+					body,
+				})
+			} else {
+				fn_signatures.push(FnSignatureDef {
+					pub_kw,
+					name,
+					generics,
+					where_clause,
+					args,
+					return_type,
+				})
+			}
+		}
+		_ => unreachable!(),
+	}
 }
 
 /// Parse a possible pub keyword and ignore the next pair
@@ -382,12 +620,16 @@ fn parse_value(mut pairs: pest::iterators::Pairs<Rule>, file: &File) -> BoxedSpa
 				}
 				Expr::If(condition, block, elseif_clauses, else_clause)
 			}
-			Rule::ident => {
-				Expr::Ident(pair.as_str().to_string())
-			}
+			Rule::ident => Expr::Ident(parse_path(pair, &file)),
 			x => unreachable!("Unexpected value: {:?}", x),
 		},
 	)
+}
+
+fn parse_path(pair: Pair<Rule>, file: &File) -> Vec<Span<String>> {
+	pair.into_inner()
+		.map(|x| Span::new(x.as_span(), file.clone(), x.as_str().to_string()))
+		.collect()
 }
 
 fn parse_block(pairs: pest::iterators::Pairs<Rule>, file: &File) -> Block {
