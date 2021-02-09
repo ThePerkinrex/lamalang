@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::backend;
 
+use backend::print_ast;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -13,7 +14,7 @@ pub struct Options {
 	#[structopt(short, long)]
 	pub lib: bool,
 	/// Output file path
-	#[structopt(short, required_ifs(&Backend::out_required(&["interpret"], &[])))]
+	#[structopt(short, required_ifs(&Backend::out_required(&["interpret", "print_ast"], &[])))]
 	out: Option<PathBuf>,
 	/// Backend to use, interpret doesn't use the out file, as it doesn't perform any kind of codegen
 	#[structopt(name = "backend", short, long, default_value, possible_values(&Backend::variants()))]
@@ -70,6 +71,7 @@ arg_enum! {
 	#[derive(PartialEq, Debug)]
 	#[allow(non_camel_case_types)]
 	pub enum Backend {
+		print_ast,
 		interpret,
 		// js
 	}
@@ -84,8 +86,9 @@ impl Default for Backend {
 impl Backend {
 	pub fn get_codegen(&self) -> Box<dyn backend::Backend> {
 		match self {
-			Self::interpret => Box::new(backend::interpreter::Codegen),
+			Backend::interpret => Box::new(backend::interpreter::Codegen),
 			// Self::js => Box::new(backend::js::Codegen),
+		    Backend::print_ast => Box::new(backend::print_ast::Codegen),
 		}
 	}
 

@@ -627,6 +627,7 @@ fn parse_value(mut pairs: pest::iterators::Pairs<Rule>, file: &File) -> BoxedSpa
 }
 
 fn parse_path(pair: Pair<Rule>, file: &File) -> Vec<Span<String>> {
+	// println!("{}", pair.as_str());
 	pair.into_inner()
 		.map(|x| Span::new(x.as_span(), file.clone(), x.as_str().to_string()))
 		.collect()

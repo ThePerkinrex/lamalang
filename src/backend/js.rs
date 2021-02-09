@@ -13,4 +13,8 @@ impl super::Backend for Codegen {
 		}
 		Ok(format!(""))
 	}
+
+	fn codegen(&self, module: crate::modules::ModuleTree, options: CodegenOptions) -> Return<String> {
+        todo!()
+    }
 }

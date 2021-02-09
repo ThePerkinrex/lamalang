@@ -41,11 +41,11 @@ fn wrapped_main() -> Return<()> {
 	let opt = options::Options::from_args();
 	println!("{:?}", opt);
 	let fs = Fs::default();
-	if let Some(p) = opt.input_file {
+	if let Some(p) = opt.input_file.clone() { // TODO unnecesary clone
 		let p: PathBuf = p;
 		let file = File::Path(p.clone());
 		let m = parser::parse_module(file.clone(), &fs);
-		let extern_libs = load_extern_libs(&fs, opt.no_std, opt.external)?;
+		let extern_libs = load_extern_libs(&fs, opt.no_std, opt.external.clone())?; // TODO unnecesary clone
 		let module = modules::build_tree(
 			&fs,
 			&file,
@@ -58,6 +58,9 @@ fn wrapped_main() -> Return<()> {
 			extern_libs,
 			module,
 		);
+		let (opt, backend) = opt.into_codegen_options();
+		let _string = backend.get_codegen().codegen(module_tree, opt)?;
+
 		// println!("{:?}", module_tree.root);
 	// TODO pass module to codegen
 	} else {

@@ -1,5 +1,6 @@
 pub mod other;
 
 fn main() -> int {
+	::core::one();
 	other::add(1, 1)
 }

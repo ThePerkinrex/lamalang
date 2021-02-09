@@ -8,7 +8,10 @@ for_kw = {"for"}
 mod_kw = {"mod"}
 use_kw = {"use"}
 
-path = _{path_part ~ ("::" ~ path_part)*}
+empty = {""}
+
+
+path = _{(empty ~ "::")? ~ path_part ~ ("::" ~ path_part)*}
 	path_part = {(ASCII_ALPHANUMERIC | "_")+}
 ident = {path}
 	ident_part = {(ASCII_ALPHA | "_")~(ASCII_ALPHANUMERIC | "_")*}
