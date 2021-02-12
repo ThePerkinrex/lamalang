@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
+
+use hashbrown::HashMap;
 
 use crate::{
 	ast::AstModule,
@@ -8,7 +10,7 @@ use crate::{
 };
 
 pub struct ModuleTree {
-	externlibs: HashMap<String, ModuleTree>,
+	pub externlibs: HashMap<String, ModuleTree>,
 	pub root: Module,
 }
 

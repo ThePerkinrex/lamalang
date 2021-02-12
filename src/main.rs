@@ -1,7 +1,7 @@
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::path::{Path, PathBuf};
 
-use error::Return;
-use fs::{File, Fs};
+use hashbrown::HashMap;
+use structopt::StructOpt;
 
 #[macro_use]
 extern crate pest_derive;
@@ -22,8 +22,9 @@ mod span;
 mod options;
 
 use modules::ModuleTree;
-use options::Options;
-use structopt::StructOpt;
+// use options::Options;
+use error::Return;
+use fs::{File, Fs};
 
 fn main() {
 	std::process::exit(match wrapped_main() {
@@ -75,6 +76,7 @@ fn wrapped_main() -> Return<()> {
 	Ok(())
 }
 
+// TODO build dependency tree for the checker to know what it can check first
 fn load_extern_libs(fs: &Fs, no_std: bool, extern_lib_list: Vec<(String, String)>) -> Return<HashMap<String, ModuleTree>> {
 	let mut extern_libs = HashMap::default();
 	load_extern_lib(&fs, &mut extern_libs, "core".into(), SYSROOT.join("core").join("lib.lama"), true)?;

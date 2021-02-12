@@ -12,3 +12,5 @@ pest_derive = "2.1.0"
 
 lazy_static = "1.4.0"
 structopt = "0.3.21"
+
+hashbrown = "0.9.1"
